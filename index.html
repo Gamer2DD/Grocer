@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreshMart - Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-firestore-compat.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #16a34a; border-radius: 10px; }
+        .order-scroll { height: 320px; overflow-y: auto; scrollbar-width: thin; }
+        #toast { transition: all 0.3s ease-in-out; bottom: -100px; opacity: 0; }
+        #toast.show { bottom: 20px; opacity: 1; }
+        .touch-btn:active { transform: scale(0.96); transition: 0.1s; }
+    </style>
+</head>
+<body class="bg-gray-50 pb-10 font-sans select-none">
+    <nav class="bg-green-600 p-4 text-white flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 shadow-lg gap-4 text-center">
+        <h1 class="text-xl font-black tracking-tighter uppercase">FreshMart</h1>
+        <div class="relative w-full md:w-1/3">
+            <input type="text" id="user-search" oninput="filterProducts()" placeholder="SEARCH ITEMS..." class="w-full p-2 pl-4 rounded-full text-gray-800 outline-none text-sm shadow-inner font-bold uppercase">
+        </div>
+        <button onclick="toggleSidebar()" class="bg-white text-green-600 px-6 py-2 rounded-full font-black shadow-md flex items-center gap-2 text-xs uppercase touch-btn">
+            🛒 MY BASKET & HISTORY
+        </button>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <div id="product-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            <p class="col-span-full text-center py-20 text-gray-400 font-bold uppercase tracking-widest">Refreshing Inventory...</p>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl z-[200] flex items-center gap-2 pointer-events-none">
+        <span class="bg-green-500 rounded-full p-1 text-[8px]">✓</span> BASKET UPDATED
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed right-0 top-0 h-full w-full md:w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center bg-green-50">
+            <h2 class="text-xl font-black text-green-800 uppercase tracking-tighter">My Basket</h2>
+            <button onclick="toggleSidebar()" class="text-2xl text-gray-400 font-black px-2">&times;</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-6">
+            <div>
+                <h3 class="text-[13px] font-black text-gray-900 uppercase tracking-widest mb-2 border-b-2 border-green-500 pb-1">Cart Items</h3>
+                <div id="cart-items" class="space-y-3"></div>
+            </div>
+            <div>
+                <h3 class="text-[13px] font-black text-gray-900 uppercase tracking-widest mb-2 border-b-2 border-green-500 pb-1">Order History</h3>
+                <div id="my-orders-list" class="order-scroll pr-2 space-y-3 pt-2"></div>
+            </div>
+        </div>
+        <div class="p-4 bg-white border-t border-gray-100 shadow-inner mt-auto">
+            <div class="flex justify-between items-end mb-3">
+                <span class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Total Bill</span>
+                <span class="text-3xl font-black text-green-600 leading-none">₹<span id="cart-total">0</span></span>
+            </div>
+            <button onclick="showCheckout()" id="checkout-btn" class="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-sm shadow-md disabled:bg-gray-200 disabled:text-gray-400 uppercase tracking-widest touch-btn" disabled>Checkout</button>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="user-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-[110] p-4 text-center">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl">
+            <div id="u-modal-icon" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"></div>
+            <h3 id="u-modal-title" class="font-black text-gray-800 uppercase mb-2 tracking-tighter">Confirm?</h3>
+            <p id="u-modal-msg" class="text-xs text-gray-500 mb-6 font-bold uppercase"></p>
+            <div class="flex gap-3">
+                <button id="u-modal-yes" class="flex-1 text-white py-3 rounded-xl font-black uppercase text-xs touch-btn tracking-widest">Confirm</button>
+                <button onclick="closeUserModal()" class="flex-1 bg-gray-100 text-gray-400 py-3 rounded-xl font-black uppercase text-xs touch-btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Max Limit Modal (Manual Close) -->
+    <div id="limit-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[120] p-4 text-center">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl border-4 border-red-50">
+            <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
+            <h3 class="font-black text-gray-800 uppercase mb-2 tracking-tighter">Limit Reached</h3>
+            <p class="text-[10px] text-gray-500 mb-6 font-bold uppercase">Maximum 5 units allowed per item.</p>
+            <button onclick="closeLimitModal()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-widest touch-btn">Understood</button>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-[70]">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl">
+            <h2 class="text-xl font-black mb-4 uppercase text-center tracking-tight">Delivery Details</h2>
+            <form id="order-form" class="space-y-4">
+                <input type="text" id="cust-name" placeholder="FULL NAME" class="w-full border-2 p-3 rounded-xl outline-none font-bold uppercase text-sm focus:border-green-500" required>
+                <input type="tel" id="cust-phone" placeholder="10 DIGIT PHONE" class="w-full border-2 p-3 rounded-xl outline-none font-bold text-sm focus:border-green-500" required>
+                <textarea id="cust-address" placeholder="ADDRESS (MIN 4 WORDS)" class="w-full border-2 p-3 rounded-xl outline-none font-bold uppercase text-sm focus:border-green-500" rows="2" required></textarea>
+                <button type="submit" id="final-confirm-btn" class="w-full bg-green-600 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-lg touch-btn">Confirm Order</button>
+                <button type="button" onclick="hideCheckout()" class="w-full text-gray-400 font-black text-[10px] py-2 uppercase tracking-widest text-center touch-btn">Back</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_IsOmBx2Qxv0M8jaK3ZsiNjoYa2uiv04",
+            authDomain: "grocery-ffa6e.firebaseapp.com",
+            projectId: "grocery-ffa6e",
+            storageBucket: "grocery-ffa6e.firebasestorage.app",
+            messagingSenderId: "101792810362",
+            appId: "1:101792810362:web:cc9a4c46f317fe5fcf82c3",
+            measurementId: "G-1E5816NG34"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let allProducts = [], cart = [], myOrderIds = JSON.parse(localStorage.getItem('my_orders')) || [];
+        let pendingAction = null, toastTimer = null, isOrdering = false;
+
+        db.collection("products").onSnapshot(snapshot => {
+            allProducts = [];
+            snapshot.forEach(doc => allProducts.push({id: doc.id, ...doc.data()}));
+            filterProducts();
+        });
+
+        function filterProducts() {
+            const query = document.getElementById('user-search').value.toLowerCase();
+            const grid = document.getElementById('product-grid');
+            const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query));
+            grid.innerHTML = filtered.length ? '' : '<p class="col-span-full text-center py-20 font-bold uppercase text-gray-300 tracking-widest">No results.</p>';
+            filtered.forEach(p => {
+                grid.innerHTML += `
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col touch-btn transition">
+                        <img src="${p.image}" class="w-full h-32 object-cover rounded-xl mb-3">
+                        <h3 class="font-black text-gray-800 text-[11px] uppercase mb-1 leading-tight">${p.name}</h3>
+                        <p class="text-green-600 font-black text-lg tracking-tighter">₹${p.price} <span class="text-[9px] text-gray-400 uppercase font-bold">/ ${p.unit}</span></p>
+                        <button onclick="openUserModal('ADD', {id:'${p.id}', name:'${p.name}', price:${p.price}, unit:'${p.unit}'})" class="mt-auto w-full bg-green-600 text-white py-2 rounded-lg font-black text-[10px] shadow-md uppercase tracking-tight">Add to Cart</button>
+                    </div>`;
+            });
+        }
+
+        function openUserModal(type, data) {
+            pendingAction = {type, data};
+            const title = document.getElementById('u-modal-title'), msg = document.getElementById('u-modal-msg'), btn = document.getElementById('u-modal-yes'), icon = document.getElementById('u-modal-icon');
+            if(type === 'ADD') {
+                title.innerText = "ADD TO BASKET?"; msg.innerText = `${data.name} ${data.unit}`;
+                btn.className = "flex-1 bg-green-600 text-white py-3 rounded-xl font-black uppercase text-xs touch-btn";
+                icon.className = "bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"; icon.innerText = "🛒";
+            } else if (type === 'CANCEL') {
+                title.innerText = "CANCEL ORDER?"; msg.innerText = `ORDER ID: #${data.id.slice(-5)}`;
+                btn.className = "flex-1 bg-red-600 text-white py-3 rounded-xl font-black uppercase text-xs touch-btn";
+                icon.className = "bg-red-100 text-red-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"; icon.innerText = "❌";
+            } else if (type === 'REMOVE_ITEM') {
+                title.innerText = "REMOVE ITEM?"; msg.innerText = `REMOVE ${data.name} FROM BASKET?`;
+                btn.className = "flex-1 bg-slate-800 text-white py-3 rounded-xl font-black uppercase text-xs touch-btn";
+                icon.className = "bg-slate-100 text-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"; icon.innerText = "🗑️";
+            }
+            document.getElementById('user-modal').classList.replace('hidden', 'flex');
+        }
+
+        document.getElementById('u-modal-yes').onclick = async () => {
+            if(pendingAction.type === 'ADD') {
+                const item = pendingAction.data;
+                const existing = cart.find(i => i.id === item.id);
+                if(existing) {
+                    if(existing.qty >= 5) { closeUserModal(); document.getElementById('limit-modal').classList.replace('hidden', 'flex'); return; }
+                    else { existing.qty++; showToast(); }
+                } else { cart.push({...item, qty: 1}); showToast(); }
+            } else if (pendingAction.type === 'CANCEL') {
+                await db.collection("orders").doc(pendingAction.data.id).update({status: "Cancelled"});
+            } else if (pendingAction.type === 'REMOVE_ITEM') {
+                cart = cart.filter(i => i.id !== pendingAction.data.id);
+                showToast();
+            }
+            updateUI(); closeUserModal();
+        };
+
+        function closeUserModal() { document.getElementById('user-modal').classList.replace('flex', 'hidden'); }
+        function closeLimitModal() { document.getElementById('limit-modal').classList.replace('flex', 'hidden'); }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            clearTimeout(toastTimer); t.classList.remove('show');
+            setTimeout(() => { t.classList.add('show'); toastTimer = setTimeout(() => t.classList.remove('show'), 2000); }, 50);
+        }
+
+        function changeQty(id, delta) {
+            const item = cart.find(i => i.id === id);
+            if(delta > 0 && item.qty >= 5) { document.getElementById('limit-modal').classList.replace('hidden', 'flex'); return; }
+            if(delta < 0 && item.qty === 1) { openUserModal('REMOVE_ITEM', item); return; }
+            item.qty += delta; showToast(); updateUI();
+        }
+
+        function updateUI() {
+            const itemsDiv = document.getElementById('cart-items');
+            itemsDiv.innerHTML = cart.map(i => `
+                <div class="bg-gray-50 p-3 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="flex justify-between items-start mb-2 uppercase">
+                        <p class="font-black text-gray-800 text-xs leading-tight">${i.name}</p>
+                        <p class="font-black text-green-600 text-[10px]">₹${i.price * i.qty}</p>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3 bg-white p-1 rounded-xl border">
+                            <button onclick="changeQty('${i.id}', -1)" class="w-6 h-6 bg-gray-100 rounded-lg font-black text-gray-500 touch-btn">-</button>
+                            <span class="font-black text-xs text-gray-800 tracking-tighter">${i.qty} ${i.unit}</span>
+                            <button onclick="changeQty('${i.id}', 1)" class="w-6 h-6 bg-green-100 rounded-lg font-black text-green-600 touch-btn">+</button>
+                        </div>
+                        <!-- VISIBLE REMOVE BOX -->
+                        <button onclick="openUserModal('REMOVE_ITEM', {id:'${i.id}', name:'${i.name}'})" class="bg-red-50 border border-red-200 text-red-500 font-black text-[9px] px-3 py-1 rounded-md uppercase tracking-tighter touch-btn">Remove</button>
+                    </div>
+                </div>`).join('');
+            document.getElementById('cart-total').innerText = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            document.getElementById('checkout-btn').disabled = cart.length === 0;
+        }
+
+        db.collection("orders").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+            const list = document.getElementById('my-orders-list');
+            const myOrders = [];
+            snapshot.forEach(doc => { if(myOrderIds.includes(doc.id)) myOrders.push({id: doc.id, ...doc.data()}); });
+            list.innerHTML = myOrders.map(o => {
+                let sColor = o.status === 'Delivered' ? 'text-green-600' : o.status === 'Out for Delivery' ? 'text-blue-500' : o.status === 'Cancelled' ? 'text-red-500' : 'text-orange-500';
+                return `
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-200 text-[10px]">
+                    <div class="flex justify-between border-b pb-1 mb-1 font-black uppercase tracking-widest">
+                        <span class="text-blue-600">ID: #${o.id.slice(-5)}</span>
+                        <span class="${sColor}">${o.status}</span>
+                    </div>
+                    <div class="font-bold text-gray-700 uppercase space-y-0.5">
+                        ${o.items.map(item => `<div>• ${item.name} ${item.qty} ${item.unit}</div>`).join('')}
+                    </div>
+                    ${o.status === 'Placed' ? `<button onclick="openUserModal('CANCEL', {id:'${o.id}'})" class="mt-2 w-full bg-red-50 text-red-500 py-1.5 rounded-lg font-black text-[8px] border border-red-100 uppercase touch-btn">Cancel Order</button>` : ''}
+                </div>`;
+            }).join('');
+        });
+
+        function hideCheckout() { document.getElementById('checkout-modal').classList.replace('flex', 'hidden'); }
+        function showCheckout() { document.getElementById('checkout-modal').classList.replace('hidden', 'flex'); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('translate-x-full'); }
+
+        document.getElementById('order-form').onsubmit = async (e) => {
+            e.preventDefault(); if(isOrdering) return;
+            const phone = document.getElementById('cust-phone').value, address = document.getElementById('cust-address').value;
+            if(!/^\d{10}$/.test(phone)) { alert("Phone must be 10 digits."); return; }
+            if(address.trim().split(/\s+/).filter(w=>w.length>0).length < 4) { alert("Address too short (Min 4 words)."); return; }
+            
+            isOrdering = true; const btn = document.getElementById('final-confirm-btn');
+            btn.disabled = true; btn.innerText = "ORDERING...";
+            try {
+                const res = await db.collection("orders").add({
+                    customer: document.getElementById('cust-name').value.toUpperCase(), phone, address: address.toUpperCase(), items: cart,
+                    total: document.getElementById('cart-total').innerText, status: "Placed", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                myOrderIds.push(res.id); localStorage.setItem('my_orders', JSON.stringify(myOrderIds));
+                cart = []; updateUI(); hideCheckout(); toggleSidebar();
+            } finally { isOrdering = false; btn.disabled = false; btn.innerText = "CONFIRM ORDER"; }
+        };
+    </script>
+</body>
+</html>
