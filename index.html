@@ -11,19 +11,50 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #16a34a; border-radius: 10px; }
         .order-scroll { height: 320px; overflow-y: auto; scrollbar-width: thin; }
-        #toast { transition: all 0.3s ease-in-out; bottom: -100px; opacity: 0; }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .product-card {
+            animation: fadeInUp 0.5s ease backwards;
+        }
+
+        #toast { 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            bottom: -100px; 
+            opacity: 0; 
+        }
         #toast.show { bottom: 20px; opacity: 1; }
+
+        .sidebar-transition {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-anim {
+            animation: popIn 0.3s ease-out;
+        }
+
         .touch-btn:active { transform: scale(0.96); transition: 0.1s; }
     </style>
 </head>
 <body class="bg-gray-50 pb-10 font-sans select-none">
     <nav class="bg-green-600 p-4 text-white flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 shadow-lg gap-4 text-center">
-        <h1 class="text-xl font-black tracking-tighter uppercase">FreshMart</h1>
+        <h1 class="text-xl font-black tracking-tighter uppercase italic">FreshMart</h1>
         <div class="relative w-full md:w-1/3">
-            <input type="text" id="user-search" oninput="filterProducts()" placeholder="SEARCH ITEMS..." class="w-full p-2 pl-4 rounded-full text-gray-800 outline-none text-sm shadow-inner font-bold uppercase">
+            <input type="text" id="user-search" oninput="filterProducts()" placeholder="SEARCH ITEMS..." class="w-full p-2 pl-4 rounded-full text-gray-800 outline-none text-sm shadow-inner font-bold uppercase border-2 border-transparent focus:border-green-300 transition-all">
         </div>
-        <button onclick="toggleSidebar()" class="bg-white text-green-600 px-6 py-2 rounded-full font-black shadow-md flex items-center gap-2 text-xs uppercase touch-btn">
+        <button onclick="toggleSidebar()" class="bg-white text-green-600 px-6 py-2 rounded-full font-black shadow-md flex items-center gap-2 text-xs uppercase touch-btn relative">
             🛒 MY BASKET & HISTORY
+            <!-- Badge: Only floats when 1 or more -->
+            <span id="basket-count" class="hidden absolute -top-2 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">0</span>
         </button>
     </nav>
 
@@ -38,8 +69,11 @@
         <span class="bg-green-500 rounded-full p-1 text-[8px]">✓</span> BASKET UPDATED
     </div>
 
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/40 hidden z-[55] backdrop-blur-sm"></div>
+
     <!-- Sidebar -->
-    <div id="sidebar" class="fixed right-0 top-0 h-full w-full md:w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] flex flex-col">
+    <div id="sidebar" class="fixed right-0 top-0 h-full w-full md:w-80 bg-white shadow-2xl transform translate-x-full sidebar-transition z-[60] flex flex-col">
         <div class="p-4 border-b flex justify-between items-center bg-green-50">
             <h2 class="text-xl font-black text-green-800 uppercase tracking-tighter">My Basket</h2>
             <button onclick="toggleSidebar()" class="text-2xl text-gray-400 font-black px-2">&times;</button>
@@ -65,7 +99,7 @@
 
     <!-- Confirmation Modal -->
     <div id="user-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-[110] p-4 text-center">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl modal-anim">
             <div id="u-modal-icon" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"></div>
             <h3 id="u-modal-title" class="font-black text-gray-800 uppercase mb-2 tracking-tighter">Confirm?</h3>
             <p id="u-modal-msg" class="text-xs text-gray-500 mb-6 font-bold uppercase"></p>
@@ -76,9 +110,9 @@
         </div>
     </div>
 
-    <!-- Max Limit Modal (Manual Close) -->
+    <!-- Max Limit Modal -->
     <div id="limit-modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[120] p-4 text-center">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl border-4 border-red-50">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl border-4 border-red-50 modal-anim">
             <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
             <h3 class="font-black text-gray-800 uppercase mb-2 tracking-tighter">Limit Reached</h3>
             <p class="text-[10px] text-gray-500 mb-6 font-bold uppercase">Maximum 5 units allowed per item.</p>
@@ -88,7 +122,7 @@
 
     <!-- Checkout Modal -->
     <div id="checkout-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-[70]">
-        <div class="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl modal-anim">
             <h2 class="text-xl font-black mb-4 uppercase text-center tracking-tight">Delivery Details</h2>
             <form id="order-form" class="space-y-4">
                 <input type="text" id="cust-name" placeholder="FULL NAME" class="w-full border-2 p-3 rounded-xl outline-none font-bold uppercase text-sm focus:border-green-500" required>
@@ -127,14 +161,16 @@
             const grid = document.getElementById('product-grid');
             const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query));
             grid.innerHTML = filtered.length ? '' : '<p class="col-span-full text-center py-20 font-bold uppercase text-gray-300 tracking-widest">No results.</p>';
-            filtered.forEach(p => {
-                grid.innerHTML += `
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col touch-btn transition">
-                        <img src="${p.image}" class="w-full h-32 object-cover rounded-xl mb-3">
-                        <h3 class="font-black text-gray-800 text-[11px] uppercase mb-1 leading-tight">${p.name}</h3>
-                        <p class="text-green-600 font-black text-lg tracking-tighter">₹${p.price} <span class="text-[9px] text-gray-400 uppercase font-bold">/ ${p.unit}</span></p>
-                        <button onclick="openUserModal('ADD', {id:'${p.id}', name:'${p.name}', price:${p.price}, unit:'${p.unit}'})" class="mt-auto w-full bg-green-600 text-white py-2 rounded-lg font-black text-[10px] shadow-md uppercase tracking-tight">Add to Cart</button>
-                    </div>`;
+            filtered.forEach((p, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col touch-btn product-card";
+                div.style.animationDelay = (index * 0.05) + "s";
+                div.innerHTML = `
+                    <img src="${p.image}" class="w-full h-32 object-cover rounded-xl mb-3">
+                    <h3 class="font-black text-gray-800 text-[11px] uppercase mb-1 leading-tight">${p.name}</h3>
+                    <p class="text-green-600 font-black text-lg tracking-tighter">₹${p.price} <span class="text-[9px] text-gray-400 uppercase font-bold">/ ${p.unit}</span></p>
+                    <button onclick="openUserModal('ADD', {id:'${p.id}', name:'${p.name}', price:${p.price}, unit:'${p.unit}'})" class="mt-auto w-full bg-green-600 text-white py-2 rounded-lg font-black text-[10px] shadow-md uppercase tracking-tight">Add to Cart</button>`;
+                grid.appendChild(div);
             });
         }
 
@@ -192,8 +228,10 @@
 
         function updateUI() {
             const itemsDiv = document.getElementById('cart-items');
+            const badge = document.getElementById('basket-count');
+            
             itemsDiv.innerHTML = cart.map(i => `
-                <div class="bg-gray-50 p-3 rounded-2xl border border-gray-100 shadow-sm">
+                <div class="bg-gray-50 p-3 rounded-2xl border border-gray-100 shadow-sm animate-slide-up">
                     <div class="flex justify-between items-start mb-2 uppercase">
                         <p class="font-black text-gray-800 text-xs leading-tight">${i.name}</p>
                         <p class="font-black text-green-600 text-[10px]">₹${i.price * i.qty}</p>
@@ -201,15 +239,23 @@
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 bg-white p-1 rounded-xl border">
                             <button onclick="changeQty('${i.id}', -1)" class="w-6 h-6 bg-gray-100 rounded-lg font-black text-gray-500 touch-btn">-</button>
-                            <span class="font-black text-xs text-gray-800 tracking-tighter">${i.qty} ${i.unit}</span>
+                            <span class="font-black text-xs text-gray-800 tracking-tighter">${i.qty}</span>
                             <button onclick="changeQty('${i.id}', 1)" class="w-6 h-6 bg-green-100 rounded-lg font-black text-green-600 touch-btn">+</button>
                         </div>
-                        <!-- VISIBLE REMOVE BOX -->
                         <button onclick="openUserModal('REMOVE_ITEM', {id:'${i.id}', name:'${i.name}'})" class="bg-red-50 border border-red-200 text-red-500 font-black text-[9px] px-3 py-1 rounded-md uppercase tracking-tighter touch-btn">Remove</button>
                     </div>
                 </div>`).join('');
+            
             document.getElementById('cart-total').innerText = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
             document.getElementById('checkout-btn').disabled = cart.length === 0;
+
+            // Float Count Logic: Hide if 0, Show if 1+
+            if(cart.length > 0) {
+                badge.innerText = cart.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
         }
 
         db.collection("orders").orderBy("createdAt", "desc").onSnapshot(snapshot => {
@@ -225,7 +271,7 @@
                         <span class="${sColor}">${o.status}</span>
                     </div>
                     <div class="font-bold text-gray-700 uppercase space-y-0.5">
-                        ${o.items.map(item => `<div>• ${item.name} ${item.qty} ${item.unit}</div>`).join('')}
+                        ${o.items.map(item => `<div>• ${item.name} x ${item.qty}</div>`).join('')}
                     </div>
                     ${o.status === 'Placed' ? `<button onclick="openUserModal('CANCEL', {id:'${o.id}'})" class="mt-2 w-full bg-red-50 text-red-500 py-1.5 rounded-lg font-black text-[8px] border border-red-100 uppercase touch-btn">Cancel Order</button>` : ''}
                 </div>`;
@@ -234,7 +280,13 @@
 
         function hideCheckout() { document.getElementById('checkout-modal').classList.replace('flex', 'hidden'); }
         function showCheckout() { document.getElementById('checkout-modal').classList.replace('hidden', 'flex'); }
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('translate-x-full'); }
+        
+        function toggleSidebar() { 
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('translate-x-full'); 
+            overlay.classList.toggle('hidden');
+        }
 
         document.getElementById('order-form').onsubmit = async (e) => {
             e.preventDefault(); if(isOrdering) return;
